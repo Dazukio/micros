@@ -2,24 +2,24 @@ package repository
 
 import (
 	"log"
-	"micros/task-service/internal/models"
+	shared_kafka "micros/shared-kafka"
 )
 
 type Repository struct {
-	taskList []*models.Task
+	taskList []*shared_kafka.Task
 }
 
 func NewRepository() (*Repository, error) {
-	return &Repository{taskList: make([]*models.Task, 0)}, nil
+	return &Repository{taskList: make([]*shared_kafka.Task, 0)}, nil
 }
 
-func (r *Repository) FindAll() []*models.Task {
+func (r *Repository) FindAll() []*shared_kafka.Task {
 	log.Print(r.taskList)
 
 	return r.taskList
 }
 
-func (r *Repository) FindById(id int) *models.Task {
+func (r *Repository) FindById(id int) *shared_kafka.Task {
 	for _, task := range r.taskList {
 		if task.Id == id {
 			return task
@@ -28,8 +28,9 @@ func (r *Repository) FindById(id int) *models.Task {
 	return nil
 }
 
-func (r *Repository) Create(task *models.Task) {
+func (r *Repository) Create(task *shared_kafka.Task) error {
 	r.taskList = append(r.taskList, task)
+	return nil
 }
 
 func (r *Repository) Delete(id int) {

@@ -1,22 +1,28 @@
 package service
 
 import (
-	"micros/task-service/internal/models"
+	"log"
+	models "micros/shared-kafka"
 )
 
 type Repository interface {
 	FindById(id int) *models.Task
-	Create(task *models.Task)
+	Create(task *models.Task) error
 	Delete(id int)
 	FindAll() []*models.Task
 }
 
-type Service struct {
-	Repo Repository
+type EventProducer interface {
+	Produce(task *models.Task) error
 }
 
-func NewService(repo Repository) *Service {
-	return &Service{Repo: repo}
+type Service struct {
+	Repo Repository
+	EP   EventProducer
+}
+
+func NewService(repo Repository, EP EventProducer) *Service {
+	return &Service{Repo: repo, EP: EP}
 }
 
 func (s *Service) FindAll() []*models.Task {
@@ -26,8 +32,13 @@ func (s *Service) FindAll() []*models.Task {
 func (s *Service) FindById(id int) *models.Task {
 	return s.Repo.FindById(id)
 }
-func (s *Service) Create(task *models.Task) {
+func (s *Service) Create(task *models.Task) error {
 	s.Repo.Create(task)
+	err := s.EP.Produce(task)
+	if err != nil {
+		log.Println("Error producing task:", err)
+	}
+	return err
 }
 func (s *Service) Delete(id int) {
 	s.Repo.Delete(id)

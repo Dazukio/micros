@@ -3,19 +3,23 @@ package main
 import (
 	"fmt"
 	"log"
-	"micros/notification-service/internal/handlers"
-	"net/http"
-
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	shared_kafka "micros/shared-kafka"
+	"sync"
 )
 
+var addresses = []string{"localhost:9092", "localhost:9093", "localhost:9094"}
+var topics = []string{"my-topic"}
+var group = "my-group"
+
 func main() {
-	r := chi.NewRouter()
-	r.Use(middleware.RequestID)
-	r.Post("/notify", handlers.Notify)
-	fmt.Println("Listening on port 8081")
-	if err := http.ListenAndServe(":8081", r); err != nil {
-		log.Fatal(err)
+
+	cons, err := shared_kafka.NewConsumer(addresses, topics, group)
+	if err != nil {
+		log.Fatalf("Failed to create consumer: %v", err)
 	}
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	fmt.Println("starting consumer")
+	go cons.StartConsuming()
+	wg.Wait()
 }

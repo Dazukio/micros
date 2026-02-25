@@ -19,7 +19,10 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	repo := &repository.Repository{}
-	EP := shared_kafka.NewProducer(addresses, topic)
+	EP, err := shared_kafka.NewProducer(addresses, topic)
+	if err != nil {
+		log.Fatal(err)
+	}
 	s := service.NewService(repo, EP)
 	handler := handlers.NewHandler(s)
 	r.Get("/tasks", handler.GetTasks)

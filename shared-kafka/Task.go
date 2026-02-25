@@ -1,4 +1,4 @@
-package models
+package shared_kafka
 
 import (
 	"time"

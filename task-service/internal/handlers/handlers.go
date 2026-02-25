@@ -1,10 +1,9 @@
 package handlers
 
 import (
-	"bytes"
 	"encoding/json"
 	"io"
-	"micros/task-service/internal/models"
+	shared_kafka "micros/shared-kafka"
 	"micros/task-service/internal/service"
 	"net/http"
 )
@@ -29,13 +28,13 @@ func (h *Handler) AddTask(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 	defer r.Body.Close()
-	task := &models.Task{}
+	task := &shared_kafka.Task{}
 	err = json.Unmarshal(body, task)
+	task.Id = len(h.Service.FindAll())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
-	h.Service.Create(task)
-	_, err = http.Post("http://127.0.0.1:8081/notify", "application/json", bytes.NewReader(body))
+	err = h.Service.Create(task)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
