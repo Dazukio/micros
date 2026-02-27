@@ -7,12 +7,16 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 )
 
+type MessageHandler interface {
+	HandleMessage(*kafka.Message) error
+}
 type Consumer struct {
 	cons    *kafka.Consumer
 	Running bool
+	Handler MessageHandler
 }
 
-func NewConsumer(addresses, topics []string, groupId string) (*Consumer, error) {
+func NewConsumer(addresses, topics []string, groupId string, handler MessageHandler) (*Consumer, error) {
 	conf := kafka.ConfigMap{
 		"bootstrap.servers":  strings.Join(addresses, ","),
 		"group.id":           groupId,
@@ -27,7 +31,7 @@ func NewConsumer(addresses, topics []string, groupId string) (*Consumer, error) 
 		cons.Close()
 		return nil, err
 	}
-	return &Consumer{cons: cons, Running: true}, nil
+	return &Consumer{cons: cons, Running: true, Handler: handler}, nil
 }
 
 func (c *Consumer) StartConsuming() {
@@ -41,7 +45,7 @@ func (c *Consumer) StartConsuming() {
 			log.Println("error reading from kafka:", err)
 			continue
 		}
-		err = c.ProcessMessage(msg)
+		err = c.Handler.HandleMessage(msg)
 		if err != nil {
 
 			log.Println("error processing message:", err)
@@ -50,11 +54,6 @@ func (c *Consumer) StartConsuming() {
 			c.cons.CommitMessage(msg)
 		}
 	}
-}
-
-func (c *Consumer) ProcessMessage(message *kafka.Message) error {
-	log.Println(string(message.Value))
-	return nil
 }
 
 func (c *Consumer) Stop() error {

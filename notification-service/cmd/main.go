@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"micros/notification-service/internal/repository"
 	shared_kafka "micros/shared-kafka"
 	"sync"
 )
@@ -12,8 +13,9 @@ var topics = []string{"my-topic"}
 var group = "my-group"
 
 func main() {
-
-	cons, err := shared_kafka.NewConsumer(addresses, topics, group)
+	//TODO: change name
+	Consumer := repository.NewConsumer()
+	cons, err := shared_kafka.NewConsumer(addresses, topics, group, Consumer)
 	if err != nil {
 		log.Fatalf("Failed to create consumer: %v", err)
 	}
