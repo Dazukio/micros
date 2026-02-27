@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	shared_kafka "micros/shared-kafka"
@@ -12,7 +13,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type OutBoxReader interface {
@@ -22,14 +23,24 @@ type OutBoxReader interface {
 
 var addresses = []string{"localhost:9092", "localhost:9093", "localhost:9094"}
 var topic = "my-topic"
+var path = ".mydb.db"
 
 func main() {
 	r := chi.NewRouter()
-	r.Use(middleware.RequestID)
 	repo := &repository.Repository{}
-	OutboxWriter := shared_kafka.NewInMemory()
-	StartWritingMessages(context.TODO(), OutboxWriter, addresses, topic)
-	s := service.NewService(repo, OutboxWriter)
+	OutboxDB, err := sql.Open("sqlite3", path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer OutboxDB.Close()
+	err = shared_kafka.MigrateOutBox(OutboxDB)
+	if err != nil {
+		log.Fatal(err)
+	}
+	Outbox := shared_kafka.NewOutBox(OutboxDB)
+
+	StartWritingMessages(context.TODO(), Outbox, addresses, topic)
+	s := service.NewService(repo, Outbox)
 	handler := handlers.NewHandler(s)
 	r.Get("/tasks", handler.GetTasks)
 	r.Post("/tasks", handler.AddTask)
@@ -64,19 +75,22 @@ func StartWritingMessages(ctx context.Context, OB OutBoxReader, addresses []stri
 	}()
 }
 
-func processMessages(OB OutBoxReader, cons *shared_kafka.Producer) {
+func processMessages(OB OutBoxReader, prod *shared_kafka.Producer) {
 	for {
 		msg, err := OB.ReadEvents()
 		if err != nil {
-			log.Println(err)
+			log.Printf("Error reading events: %v", err)
 			break
 		}
 		if msg == nil {
 			break
 		}
-		err = cons.Produce(msg)
-		if err != nil {
-			log.Println(err)
+
+		log.Printf("Sending task %d to Kafka", msg.Id)
+		if err := prod.Produce(msg); err != nil {
+			log.Printf("Failed to send task %d: %v", msg.Id, err)
+			continue
 		}
+		log.Printf("Task %d sent successfully", msg.Id)
 	}
 }
