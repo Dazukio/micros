@@ -47,7 +47,6 @@ func (c *Consumer) StartConsuming() {
 		}
 		err = c.Handler.HandleMessage(msg)
 		if err != nil {
-
 			log.Println("error processing message:", err)
 			continue
 		} else {

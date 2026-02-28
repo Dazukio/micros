@@ -1,0 +1,30 @@
+version: '3'
+
+vars:
+  APP_NAME: micros_tasks
+  VERSION: 1.0.0
+  PathToDb: "./internal/storage/db.db"
+  DBigrationPath: "./storage/migrations/"
+  OBMigrationPath: "../shared-kafka/migrations/OutBox/"
+
+tasks:
+  default:
+    desc: "List of all available tasks"
+    cmd: task --list
+  greet:
+    desc: "A small echo hello"
+    cmd: echo "Hello, {{.CLI_ARGS}}"
+  db-migrate:
+    desc: "run task main db"
+    cmds:
+    - goose sqlite3 "{{.PathToDb}}" up -dir "{{.DBigrationPath}}"
+    - goose sqlite3 "{{.PathToDb}}" up -dir "{{.OBMigrationPath}}"
+#    sources:
+#      - ./shared-kafka/OutBox/*.sql
+#      - ./task-service/internal/storage/*.sql
+  db-down:
+    - goose sqlite3 "{{.PathToDb}}" down -dir "{{.DBigrationPath}}"
+    - goose sqlite3 "{{.PathToDb}}" down -dir "{{.OBMigrationPath}}"
+  task-service:
+    desc: "run task microservice"
+    cmd: cd ./cmd && go run main.go

@@ -1,44 +1,48 @@
 package repository
 
 import (
-	"encoding/json"
-	"fmt"
+	"database/sql"
+	"errors"
 	"log"
-	shared_kafka "micros/shared-kafka"
+	"strconv"
 	"sync"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 )
 
 type Consumer struct {
-	mu              *sync.RWMutex
-	processedEvents map[int]bool
+	mu *sync.RWMutex
+	db *sql.DB
 }
 
-func NewConsumer() *Consumer {
-	return &Consumer{mu: &sync.RWMutex{}, processedEvents: make(map[int]bool)}
+func NewConsumer(db *sql.DB) *Consumer {
+	return &Consumer{mu: &sync.RWMutex{}, db: db}
 }
 
 func (consumer *Consumer) HandleMessage(msg *kafka.Message) error {
-	var task shared_kafka.Task
-	err := json.Unmarshal(msg.Value, &task)
+	consumer.mu.Lock()
+	defer consumer.mu.Unlock()
+	getSql := consumer.db.QueryRow("SELECT * FROM messages WHERE ID = ?", msg.Key)
+	err := getSql.Err()
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		return err
+	}
+	return consumer.MarkProcessed(msg)
+}
+
+func (consumer *Consumer) MarkProcessed(msg *kafka.Message) error {
+	id, err := strconv.Atoi(string(msg.Key))
 	if err != nil {
 		return err
 	}
+	_, err = consumer.db.Exec("INSERT INTO  messages (ID, message, processed) VALUES (?,?,?)", id, msg.Value, true)
 
-	consumer.mu.RLock()
-	if consumer.processedEvents[task.Id] {
-		log.Println("Duplicated event", task.Id)
-		consumer.mu.RUnlock()
-		return nil
+	if err != nil {
+		return err
 	}
-
-	consumer.mu.RUnlock()
-
-	fmt.Printf("New event: %#+v\n", task)
-
-	consumer.mu.Lock()
-	consumer.processedEvents[task.Id] = true
-	consumer.mu.Unlock()
+	log.Printf("%+v\n", string(msg.Value))
 	return nil
 }
