@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"embed"
 	"fmt"
 	"log"
 	shared_kafka "micros/shared-kafka"
@@ -21,29 +22,33 @@ type OutBoxReader interface {
 	GetNotifier() <-chan struct{}
 }
 
+var OutBoxMigrations embed.FS
 var addresses = []string{"localhost:9092", "localhost:9093", "localhost:9094"}
 var topic = "my-topic"
-var path = ".mydb.db"
+var DBPath = "../internal/storage/db.db"
 
 func main() {
 	r := chi.NewRouter()
-	repo := &repository.Repository{}
-	OutboxDB, err := sql.Open("sqlite3", path)
+	db, err := sql.Open("sqlite3", DBPath)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer OutboxDB.Close()
-	err = shared_kafka.MigrateOutBox(OutboxDB)
+	defer db.Close()
+
+	repo := repository.NewRepository(db)
+
+	err = shared_kafka.MigrateOutBox(db)
 	if err != nil {
 		log.Fatal(err)
 	}
-	Outbox := shared_kafka.NewOutBox(OutboxDB)
+	Outbox := shared_kafka.NewOutBox(db)
 
 	StartWritingMessages(context.TODO(), Outbox, addresses, topic)
-	s := service.NewService(repo, Outbox)
+
+	s := service.NewService(repo, db, Outbox)
 	handler := handlers.NewHandler(s)
-	r.Get("/tasks", handler.GetTasks)
 	r.Post("/tasks", handler.AddTask)
+	r.Get("/tasks/{id}", handler.GetTaskById)
 	log.Println("Listening on port 8081")
 	if err := http.ListenAndServe(":8081", r); err != nil {
 		log.Fatal(err)

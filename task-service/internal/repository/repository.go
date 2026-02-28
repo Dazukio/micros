@@ -1,38 +1,39 @@
 package repository
 
 import (
-	"log"
+	"database/sql"
 	shared_kafka "micros/shared-kafka"
+	"time"
 )
 
 type Repository struct {
-	taskList []*shared_kafka.Task
+	db        *sql.DB
+	insertSql string
+	findBySql string
 }
 
-func NewRepository() (*Repository, error) {
-	return &Repository{taskList: make([]*shared_kafka.Task, 0)}, nil
-}
-
-func (r *Repository) FindAll() []*shared_kafka.Task {
-	log.Print(r.taskList)
-
-	return r.taskList
+func NewRepository(db *sql.DB) *Repository {
+	return &Repository{db: db, insertSql: "INSERT INTO tasks (TITLE, DEADLINE) VALUES (?, ?);",
+		findBySql: "SELECT ID, TITLE, DEADLINE  FROM tasks WHERE ID = ? LIMIT 1;"}
 }
 
 func (r *Repository) FindById(id int) *shared_kafka.Task {
-	for _, task := range r.taskList {
-		if task.Id == id {
-			return task
-		}
+	var taskId int
+	var title string
+	var deadline time.Time
+	err := r.db.QueryRow(r.findBySql, id).Scan(&taskId, &title, &deadline)
+	if err != nil {
+		return nil
 	}
-	return nil
+	return &shared_kafka.Task{Id: id, Title: title, Deadline: deadline}
 }
 
-func (r *Repository) Create(task *shared_kafka.Task) error {
-	r.taskList = append(r.taskList, task)
-	return nil
-}
-
-func (r *Repository) Delete(id int) {
-	r.taskList = append(r.taskList[:id], r.taskList[id+1:]...)
+func (r *Repository) Create(tx *sql.Tx, task *shared_kafka.Task) error {
+	result, err := tx.Exec(r.insertSql, task.Title, task.Deadline)
+	id, err := result.LastInsertId()
+	if err != nil {
+		return err
+	}
+	task.Id = int(id)
+	return err
 }

@@ -1,0 +1,27 @@
+version: '3'
+
+vars:
+  APP_NAME: micros
+  VERSION: 1.0.0
+
+tasks:
+  default:
+    desc: "List of all available tasks"
+    cmd: task --list
+  greet:
+    desc: "A small echo hello"
+    cmd: echo "Hello, {{.CLI_ARGS}}"
+  db-migrate:
+    desc: "run task main db"
+    cmds:
+    - goose sqlite3 "./task-service/internal/storage/db.db" up -dir ./task-service/internal/storage/migrations/
+    - goose sqlite3 "./task-service/internal/storage/db.db" up -dir ./shared-kafka/migrations/OutBox/
+#    sources:
+#      - ./shared-kafka/OutBox/*.sql
+#      - ./task-service/internal/storage/*.sql
+  db-down:
+    - goose sqlite3 "./task-service/internal/storage/db.db" down -dir ./task-service/internal/storage/migrations/
+    - goose sqlite3 "./task-service/internal/storage/db.db" down -dir ./shared-kafka/migrations/OutBox/
+  task-service:
+    desc: "run task microservice"
+    cmd: cd ./task-service/cmd && go run main.go

@@ -6,6 +6,9 @@ import (
 	shared_kafka "micros/shared-kafka"
 	"micros/task-service/internal/service"
 	"net/http"
+	"strconv"
+
+	"github.com/go-chi/chi/v5"
 )
 
 type Handler struct {
@@ -16,12 +19,6 @@ func NewHandler(service *service.Service) *Handler {
 	return &Handler{Service: service}
 }
 
-func (h *Handler) GetTasks(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(h.Service.FindAll())
-}
-
 func (h *Handler) AddTask(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -30,7 +27,6 @@ func (h *Handler) AddTask(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	task := &shared_kafka.Task{}
 	err = json.Unmarshal(body, task)
-	task.Id = len(h.Service.FindAll())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
@@ -38,4 +34,16 @@ func (h *Handler) AddTask(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
+}
+
+func (h *Handler) GetTaskById(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+	task := h.Service.FindById(id)
+	if task == nil {
+		http.Error(w, "Task not found", http.StatusNotFound)
+	}
+	json.NewEncoder(w).Encode(task)
 }
