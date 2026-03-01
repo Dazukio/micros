@@ -57,19 +57,17 @@ func (p *Producer) Stop() {
 func (p *Producer) CheckResponse() {
 	go func() {
 		for p.Running {
-			select {
-			case e := <-p.DeliveryChan:
-				switch ev := e.(type) {
-				case *kafka.Message:
-					if ev.TopicPartition.Error != nil {
-						log.Printf("Delivery failed: %v", ev.TopicPartition)
-					} else {
-						log.Printf("Success delivery message: %v", ev)
-					}
-				case kafka.Error:
-					log.Printf("Delivery failed: %v", ev.Error())
-
+			e := <-p.DeliveryChan
+			switch ev := e.(type) {
+			case *kafka.Message:
+				if ev.TopicPartition.Error != nil {
+					log.Printf("Delivery failed: %v", ev.TopicPartition)
+				} else {
+					log.Printf("Success delivery message: %v", ev)
 				}
+			case kafka.Error:
+				log.Printf("Delivery failed: %v", ev.Error())
+
 			}
 		}
 	}()

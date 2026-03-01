@@ -30,6 +30,9 @@ func (r *Repository) FindById(id int) *shared_kafka.Task {
 
 func (r *Repository) Create(tx *sql.Tx, task *shared_kafka.Task) error {
 	result, err := tx.Exec(r.insertSql, task.Title, task.Deadline)
+	if err != nil {
+		return err
+	}
 	id, err := result.LastInsertId()
 	if err != nil {
 		return err
